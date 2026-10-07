@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Prokaryotic Cell — Interactive 3D Model</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #eef3f6; --panel-bg: rgba(255,255,255,0.68);
+    --panel-border: rgba(40,70,95,0.16); --text: #142a38; --text-dim: #4d6578;
+    --accent: #2f78a0; --accent2: #e8926b; --accent3: #7bbf6e;
+    --accent-soft: rgba(47,120,160,0.13);
+    --line: #2f78a0; --shadow: 0 10px 32px rgba(15,35,50,0.16); --radius: 18px;
+    --sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --display: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg: #0c161e; --panel-bg: rgba(16,26,34,0.72);
+      --panel-border: rgba(140,190,220,0.16); --text: #e8f2f7; --text-dim: #9db3c2;
+      --accent: #6cb8e6; --accent2: #f0a480; --accent3: #8fd083;
+      --accent-soft: rgba(108,184,230,0.14);
+      --line: #6cb8e6; --shadow: 0 10px 32px rgba(0,0,0,0.5);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg: #0c161e; --panel-bg: rgba(16,26,34,0.72);
+    --panel-border: rgba(140,190,220,0.16); --text: #e8f2f7; --text-dim: #9db3c2;
+    --accent: #6cb8e6; --accent2: #f0a480; --accent3: #8fd083;
+    --accent-soft: rgba(108,184,230,0.14);
+    --line: #6cb8e6; --shadow: 0 10px 32px rgba(0,0,0,0.5);
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:var(--bg);}
+  body{font-family:var(--sans);color:var(--text);}
+
+  #app{position:fixed;inset:0;}
+  #canvasHolder{position:absolute;inset:0;}
+  canvas{display:block;touch-action:none;}
+  #vignette{
+    position:absolute; inset:0; z-index:5; pointer-events:none;
+    background: radial-gradient(ellipse at 50% 42%, rgba(0,0,0,0) 50%, rgba(6,16,22,0.18) 100%);
+  }
+
+  /* ---------- Sidebar ---------- */
+  #sidebar{
+    position:absolute; top:18px; left:18px; bottom:18px;
+    width:308px; max-width:calc(100vw - 36px);
+    background:var(--panel-bg); border:1px solid var(--panel-border); border-radius:var(--radius);
+    backdrop-filter: blur(20px) saturate(150%); -webkit-backdrop-filter: blur(20px) saturate(150%);
+    box-shadow:var(--shadow); display:flex; flex-direction:column; overflow:hidden;
+    transition: transform .35s cubic-bezier(.4,0,.2,1); z-index:20;
+  }
+  .sidebar-head{padding:20px 20px 10px;flex:0 0 auto; position:relative;}
+  .sidebar-head::after{
+    content:""; position:absolute; left:20px; right:20px; bottom:0; height:1px;
+    background:linear-gradient(90deg, var(--panel-border), transparent);
+  }
+  .reset-btn{
+    display:inline-flex;align-items:center;gap:6px; background:var(--accent-soft); color:var(--accent);
+    border:1px solid var(--panel-border); border-radius:999px; font-family:var(--sans); font-weight:600;
+    font-size:12px; padding:6px 13px; cursor:pointer; margin-bottom:12px;
+    transition: background .2s ease, transform .15s ease;
+  }
+  .reset-btn:hover{background:var(--accent); color:#fff; transform:translateY(-1px);}
+  .reset-btn:active{transform:translateY(0);}
+  .kicker{
+    display:inline-flex; align-items:center; gap:6px; font-size:10px; font-weight:700;
+    letter-spacing:1.3px; color:var(--accent); background:var(--accent-soft);
+    padding:4px 10px 4px 8px; border-radius:999px; margin:0 0 10px; text-transform:uppercase;
+  }
+  h1.title{
+    font-family:var(--display); font-weight:800; font-size:25px; margin:0 0 6px; letter-spacing:.2px;
+    background:linear-gradient(120deg, var(--accent) 0%, var(--accent3) 55%, var(--accent2) 100%);
+    -webkit-background-clip:text; background-clip:text; color:var(--accent);
+    -webkit-text-fill-color:transparent;
+  }
+  p.summary{margin:0 0 10px; font-size:12.5px; line-height:1.55; color:var(--text-dim);}
+  .stat-line{
+    display:flex; align-items:center; gap:6px; font-size:11.5px; font-weight:600; color:var(--accent);
+    margin:0 0 14px;
+  }
+  .stat-line .num{
+    font-family:var(--display); font-weight:800; font-size:13px; color:var(--text);
+    background:var(--accent-soft); padding:1px 8px; border-radius:8px;
+  }
+
+  #orgList{flex:1 1 auto; overflow-y:auto; padding:6px 12px 16px;}
+  #orgList::-webkit-scrollbar{width:6px;}
+  #orgList::-webkit-scrollbar-thumb{background:var(--panel-border); border-radius:4px;}
+
+  .section-head{display:flex; align-items:center; gap:7px; margin:16px 8px 6px; opacity:.9;}
+  .section-head:first-child{margin-top:2px;}
+  .section-head .ic{font-size:13px;}
+  .section-head .tx{font-size:10px; font-weight:800; letter-spacing:1px; text-transform:uppercase; color:var(--text-dim); white-space:nowrap;}
+  .section-head .bar{flex:1; height:1px; background:linear-gradient(90deg, var(--panel-border), transparent);}
+
+  .org-btn{
+    width:100%; text-align:left; display:flex; align-items:center; gap:10px; background:transparent;
+    border:none; border-radius:13px; padding:8px 9px; margin:2px 0; cursor:pointer;
+    font-family:var(--sans); font-size:13.5px; font-weight:500; color:var(--text);
+    transition: background .18s ease, color .18s ease, transform .18s ease;
+  }
+  .org-btn .badge{
+    width:28px; height:28px; border-radius:50%; flex:0 0 auto; display:flex; align-items:center;
+    justify-content:center; font-size:14px; box-shadow: inset 0 0 0 1.5px transparent;
+    transition: box-shadow .18s ease, transform .18s ease;
+  }
+  .org-btn .lbl{flex:1;}
+  .org-btn .arrow{opacity:0; font-size:12px; transform:translateX(-4px); transition: opacity .18s ease, transform .18s ease;}
+  .org-btn:hover{background:var(--accent-soft); transform:translateX(1px);}
+  .org-btn:hover .arrow{opacity:.6; transform:translateX(0);}
+  .org-btn.active{background:linear-gradient(90deg, var(--accent-soft), transparent);}
+  .org-btn.active .badge{box-shadow: inset 0 0 0 1.5px currentColor;}
+  .org-btn.active .arrow{opacity:1; transform:translateX(0); color:var(--accent);}
+  .org-btn.active .lbl{color:var(--accent); font-weight:700;}
+
+  #sidebarToggle{
+    position:absolute; top:18px; left:18px; z-index:25; width:46px;height:46px; border-radius:14px;
+    border:1px solid var(--panel-border); background:var(--panel-bg); backdrop-filter:blur(14px);
+    display:none; align-items:center; justify-content:center; font-size:20px; color:var(--text);
+    cursor:pointer; box-shadow:var(--shadow);
+  }
+
+  /* ---------- Annotation ---------- */
+  #annotation{
+    position:absolute; top:18px; right:18px; width:288px; max-width:calc(100vw - 36px);
+    background:var(--panel-bg); border:1px solid var(--panel-border); border-radius:var(--radius);
+    backdrop-filter:blur(18px) saturate(140%); box-shadow:var(--shadow); padding:16px 18px; z-index:22;
+    opacity:0; transform:translateY(-6px) scale(.98); pointer-events:none;
+    transition: opacity .22s ease, transform .22s ease;
+  }
+  #annotation.show{opacity:1; transform:translateY(0) scale(1); pointer-events:auto;}
+  #annoClose{
+    position:absolute; top:12px; right:12px; width:24px;height:24px; border:none; border-radius:50%;
+    background:var(--accent-soft); color:var(--accent); cursor:pointer; font-size:14px; line-height:1;
+  }
+  #annoEyebrow{font-size:10.5px; font-weight:700; color:var(--accent2); letter-spacing:.6px; margin:0 0 4px; text-transform:uppercase;}
+  #annoTitle{font-family:var(--display); font-size:19px; font-weight:700; margin:0 0 9px; padding-right:24px; display:flex; align-items:center; gap:8px;}
+  #annoTitle .ic{font-size:19px;}
+  #annoNote{font-size:11px; color:var(--text-dim); margin:0 0 10px; font-style:italic;}
+  .anno-row{margin:0 0 8px;}
+  .anno-row .label{font-size:10.5px; font-weight:600; color:var(--text-dim); margin:0 0 2px;}
+  .anno-row .val{font-size:13px; line-height:1.5; color:var(--text); margin:0;}
+
+  #leaderSvg{position:absolute; inset:0; width:100%; height:100%; z-index:15; pointer-events:none; opacity:0; transition:opacity .2s ease;}
+  #leaderSvg line{stroke:var(--line); stroke-width:1.5; stroke-dasharray:3 4; opacity:.85;}
+  #markerCore{stroke:#fff; stroke-width:1.5;}
+  #markerPulse{fill:none; stroke-width:2;}
+
+  /* ---------- Loading & hint ---------- */
+  #loading{
+    position:absolute; inset:0; z-index:50; background:var(--bg); display:flex; align-items:center;
+    justify-content:center; flex-direction:column; gap:12px; font-family:var(--display); transition:opacity .4s ease;
+  }
+  #loading .ring{width:38px;height:38px;border-radius:50%; border:3px solid var(--accent-soft); border-top-color:var(--accent); animation:spin 0.9s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  #hint{
+    position:absolute; bottom:16px; left:50%; transform:translateX(-50%); font-size:12px; color:var(--text-dim);
+    background:var(--panel-bg); border:1px solid var(--panel-border); padding:7px 14px; border-radius:999px;
+    backdrop-filter:blur(12px); z-index:18; white-space:nowrap;
+  }
+
+  @media (max-width: 760px){
+    #sidebar{transform:translateX(calc(-100% - 30px)); top:0; left:0; bottom:0; width:min(320px,86vw); border-radius:0 20px 20px 0;}
+    #sidebar.open{transform:translateX(0);}
+    #sidebarToggle{display:flex;}
+    #annotation{left:14px !important; right:14px !important; width:auto !important; top:auto !important; bottom:78px !important;}
+    #hint{display:none;}
+    #leaderSvg{opacity:0 !important;}
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .reset-btn, .org-btn, #annotation, #sidebar{transition:none;}
+    #loading .ring{animation:none;}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="canvasHolder"></div>
+  <div id="vignette"></div>
+  <svg id="leaderSvg">
+    <line id="leaderLine" x1="0" y1="0" x2="0" y2="0"></line>
+    <circle id="markerPulse" cx="0" cy="0" r="6"></circle>
+    <circle id="markerCore" cx="0" cy="0" r="4.5"></circle>
+  </svg>
+
+  <button id="sidebarToggle" aria-label="Toggle menu">☰</button>
+
+  <aside id="sidebar">
+    <div class="sidebar-head">
+      <button id="resetBtn" class="reset-btn">⟲ Reset view</button>
+      <div class="kicker">🦠 Interactive Atlas</div>
+      <h1 class="title">Prokaryotic Cell</h1>
+      <p class="summary">Prokaryotic cells are simple, typically single-celled organisms (bacteria and archaea) with no nucleus or membrane-bound organelles. Their DNA sits loose in a nucleoid region, often alongside small extra loops called plasmids.</p>
+      <p class="stat-line">🔍 <span class="num" id="orgCount">0</span> structures to explore</p>
+    </div>
+    <nav id="orgList"></nav>
+  </aside>
+
+  <div id="annotation">
+    <button id="annoClose" aria-label="Close">×</button>
+    <p id="annoEyebrow">Structure</p>
+    <h2 id="annoTitle"><span class="ic" id="annoIcon"></span><span id="annoTitleText"></span></h2>
+    <p id="annoNote" style="display:none;"></p>
+    <div class="anno-row"><p class="label">Composition</p><p class="val" id="annoComposition"></p></div>
+    <div class="anno-row"><p class="label">Function</p><p class="val" id="annoFunction"></p></div>
+  </div>
+
+  <div id="hint">Drag to rotate · Scroll to zoom · Tap a structure to learn more</div>
+
+  <div id="loading"><div class="ring"></div><div>Loading 3D model…</div></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+  function makeSkyTexture(topHex, bottomHex){
+    var c = document.createElement('canvas');
+    c.width = 8; c.height = 256;
+    var ctx = c.getContext('2d');
+    var g = ctx.createLinearGradient(0,0,0,256);
+    g.addColorStop(0, topHex);
+    g.addColorStop(1, bottomHex);
+    ctx.fillStyle = g;
+    ctx.fillRect(0,0,8,256);
+    var tex = new THREE.CanvasTexture(c);
+    tex.needsUpdate = true;
+    return tex;
+  }
+  var SKY_TOP = prefersDark ? '#13202b' : '#eef7fb';
+  var SKY_BOTTOM = prefersDark ? '#060d12' : '#a9d3df';
+  var FOG_COLOR = prefersDark ? 0x0a141a : 0xc3e2ea;
+
+  var holder = document.getElementById('canvasHolder');
+  var scene = new THREE.Scene();
+  scene.background = makeSkyTexture(SKY_TOP, SKY_BOTTOM);
+  scene.fog = new THREE.Fog(FOG_COLOR, 44, 92);
+
+  var camera = new THREE.PerspectiveCamera(42, window.innerWidth/window.innerHeight, 0.1, 500);
+  var DEFAULT_CAM_POS = new THREE.Vector3(15, 10.5, 19);
+  var DEFAULT_TARGET  = new THREE.Vector3(0, 0, 0);
+  camera.position.copy(DEFAULT_CAM_POS);
+
+  var renderer = new THREE.WebGLRenderer({antialias:true, alpha:false});
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.1;
+  renderer.localClippingEnabled = true;
+  holder.appendChild(renderer.domElement);
+
+  var controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.minDistance = 2.0;
+  controls.maxDistance = 56;
+  controls.target.copy(DEFAULT_TARGET);
+  controls.update();
+
+  var FOCUS_DIR = new THREE.Vector3(0.5, 0.42, 0.82).normalize();
+  // Cutaway plane: keeps the far half of the cell body, clips away the
+  // near half (facing the default camera) so the interior is visible.
+  var CUT_NORMAL = FOCUS_DIR.clone().negate();
+  var cutPlane = new THREE.Plane(CUT_NORMAL, 0.35);
+
+  scene.add(new THREE.HemisphereLight(0xeaf7ff, 0x1c2c38, 0.55));
+  scene.add(new THREE.AmbientLight(0xffffff, 0.38));
+  var keyLight = new THREE.DirectionalLight(0xfff6e8, 1.0);
+  keyLight.position.set(16, 22, 16);
+  scene.add(keyLight);
+  var fillLight = new THREE.DirectionalLight(0xcfe8ff, 0.4);
+  fillLight.position.set(-16, 8, -12);
+  scene.add(fillLight);
+  var rimLight = new THREE.PointLight(0xffffff, 0.4, 80);
+  rimLight.position.set(0, 12, 18);
+  scene.add(rimLight);
+
+  /* ============ Helpers ============ */
+  function mat(color, opts){
+    opts = opts || {};
+    return new THREE.MeshPhysicalMaterial(Object.assign({
+      color: color, roughness: 0.5, metalness: 0.05,
+      clearcoat: opts.clearcoat!==undefined?opts.clearcoat:0.25,
+      clearcoatRoughness: 0.3,
+      transparent: !!opts.opacity, opacity: (opts.opacity===undefined?1:opts.opacity),
+      emissive: 0x000000, emissiveIntensity: 0
+    }, opts));
+  }
+  function clippedMat(color, opts){
+    var m = mat(color, Object.assign({side: THREE.DoubleSide}, opts));
+    m.clippingPlanes = [cutPlane];
+    return m;
+  }
+  function hexToRgba(hexNum, a){
+    var h = '#'+hexNum.toString(16).padStart(6,'0');
+    var r = parseInt(h.slice(1,3),16), g = parseInt(h.slice(3,5),16), b = parseInt(h.slice(5,7),16);
+    return 'rgba('+r+','+g+','+b+','+a+')';
+  }
+  // A capsule/pill shape built from an open cylinder + two end spheres,
+  // all sharing one material (so a clip plane cuts all three as one body).
+  function buildPill(radius, halfLength, material){
+    var g = new THREE.Group();
+    var cyl = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, halfLength*2, 28, 1, true), material);
+    cyl.rotation.z = Math.PI/2;
+    g.add(cyl);
+    var capA = new THREE.Mesh(new THREE.SphereGeometry(radius, 24, 16), material);
+    capA.position.x = halfLength;
+    g.add(capA);
+    var capB = new THREE.Mesh(new THREE.SphereGeometry(radius, 24, 16), material);
+    capB.position.x = -halfLength;
+    g.add(capB);
+    return g;
+  }
+
+  var interactive = [];
+  var registry = [];
+  var regByKey = {};
+  var driftList = [];
+
+  function addDrift(obj, opts){
+    opts = opts || {};
+    driftList.push({
+      obj: obj, baseY: obj.position.y, baseRotY: obj.rotation.y,
+      ampY: opts.ampY!==undefined?opts.ampY:0.1,
+      ampRotY: opts.ampRotY!==undefined?opts.ampRotY:0,
+      spin: opts.spin || 0,
+      speed: opts.speed || (0.45+Math.random()*0.35),
+      phase: opts.phase!==undefined?opts.phase:Math.random()*Math.PI*2
+    });
+  }
+
+  function collectMaterials(obj){
+    var mats = [];
+    obj.traverse(function(o){
+      if(o.isMesh && o.material && !Array.isArray(o.material) && o.material.emissive){
+        mats.push(o.material);
+      }
+    });
+    return mats;
+  }
+
+  function tagInstance(keyName, instanceObj){
+    instanceObj.traverse(function(o){
+      if(o.isMesh){
+        o.userData.orgKey = keyName;
+        o.userData.instanceRef = instanceObj;
+        interactive.push(o);
+      }
+    });
+  }
+
+  function addOrganelle(keyName, label, icon, color, object3d, info, focusPad, instances){
+    instances = instances && instances.length ? instances : [object3d];
+    instances.forEach(function(inst){ tagInstance(keyName, inst); });
+    var entry = {
+      key: keyName, label: label, icon: icon, color: color, object: object3d,
+      instances: instances, mats: collectMaterials(object3d),
+      info: info, focusPad: focusPad || 2.0
+    };
+    registry.push(entry);
+    regByKey[keyName] = entry;
+    scene.add(object3d);
+    return entry;
+  }
+
+  var BODY_HALF_LEN = 6.6;
+
+  /* ============ Capsule / Cell Wall / Plasma Membrane / Cytoplasm ============ */
+  var capsuleGroup = buildPill(3.85, BODY_HALF_LEN, clippedMat(0xcdeaf5, {opacity:0.22, roughness:.3, clearcoat:0.4}));
+  addOrganelle('capsule', 'Capsule', '🧫', 0xcdeaf5, capsuleGroup, {
+    composition: 'A thick, sticky outer layer made mostly of polysaccharides (sometimes protein).',
+    function: 'Shields the cell from drying out and from the host immune system, and helps it stick to surfaces.'
+  }, 1.35);
+
+  var wallGroup = buildPill(3.35, BODY_HALF_LEN - 0.1, clippedMat(0xdcc97e, {roughness:.65, clearcoat:0.15}));
+  addOrganelle('cell wall', 'Cell Wall', '🧱', 0xdcc97e, wallGroup, {
+    composition: 'A rigid layer built mainly of peptidoglycan (murein) mesh.',
+    function: 'Gives the cell its shape and keeps it from bursting under osmotic pressure.'
+  }, 1.4);
+
+  var membraneGroup = buildPill(2.95, BODY_HALF_LEN - 0.3, clippedMat(0xe79b8c, {opacity:0.9, roughness:.4, clearcoat:0.3}));
+  addOrganelle('plasma membrane', 'Plasma Membrane', '🛡️', 0xe79b8c, membraneGroup, {
+    composition: 'A phospholipid bilayer embedded with transport and signaling proteins.',
+    function: 'Controls what moves into and out of the cell and hosts key metabolic reactions.'
+  }, 1.6);
+
+  var cytoMat = clippedMat(0xf3f0d8, {opacity:0.1, roughness:1, clearcoat:0});
+  var cytoGroup = buildPill(2.55, BODY_HALF_LEN - 0.5, cytoMat);
+  addOrganelle('cytoplasm', 'Cytoplasm', '🌊', 0xf3f0d8, cytoGroup, {
+    composition: 'A gel-like fluid of water, enzymes, salts and nutrients filling the cell.',
+    function: 'Hosts metabolism and suspends the nucleoid, ribosomes and other contents.'
+  }, 1.5);
+
+  /* ============ Nucleoid ============ */
+  var nucleoidGroup = new THREE.Group();
+  var nucleoidMat = mat(0x4a3f8a, {roughness:.4, clearcoat:0.15});
+  // Smooth, bounded Lissajous-style loops instead of splines through random
+  // unordered points (those used to overshoot wildly between points and
+  // spike far outside the cell — this keeps every strand inside a fixed radius).
+  for(var nd=0; nd<4; nd++){
+    var fx = 2 + nd%3, fy = 3 - (nd%2), fz = 2 + (nd+1)%3;
+    var ox = Math.random()*Math.PI*2, oy = Math.random()*Math.PI*2, oz = Math.random()*Math.PI*2;
+    var ax = 0.85 + Math.random()*0.15, ay = 0.5 + Math.random()*0.15, az = 0.5 + Math.random()*0.15;
+    var pts = [];
+    var STRAND_STEPS = 64;
+    for(var sIdx=0; sIdx<=STRAND_STEPS; sIdx++){
+      var s = (sIdx/STRAND_STEPS)*Math.PI*2;
+      pts.push(new THREE.Vector3(
+        Math.sin(fx*s+ox)*ax,
+        Math.sin(fy*s+oy)*ay,
+        Math.sin(fz*s+oz)*az
+      ));
+    }
+    var curve = new THREE.CatmullRomCurve3(pts, true);
+    var tube = new THREE.Mesh(new THREE.TubeGeometry(curve, 110, 0.085, 6, true), nucleoidMat);
+    nucleoidGroup.add(tube);
+  }
+  nucleoidGroup.position.set(-0.4, -0.1, 0.2);
+  addOrganelle('nucleoid', 'Nucleoid', '🧬', 0x4a3f8a, nucleoidGroup, {
+    composition: 'A single, circular, supercoiled chromosome that is not enclosed by a membrane.',
+    function: "Holds the cell's main genetic material and directs protein synthesis."
+  }, 2.6);
+  addDrift(nucleoidGroup, {ampY:0.06, speed:0.3, ampRotY:0.06});
+
+  /* ============ Plasmids ============ */
+  var plasmidInstances = [];
+  var plasmidGroup = new THREE.Group();
+  var plasmidMat = mat(0x2ecc71, {roughness:.35, clearcoat:0.4});
+  [[2.8,1.2,0.6],[2.2,-1.4,1.0]].forEach(function(p){
+    var ring = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.07, 10, 24), plasmidMat);
+    ring.position.set(p[0],p[1],p[2]);
+    ring.rotation.x = Math.random()*Math.PI;
+    plasmidGroup.add(ring);
+    plasmidInstances.push(ring);
+    addDrift(ring, {ampY:0.1, speed:0.5+Math.random()*0.3, spin:0.3});
+  });
+  addOrganelle('plasmid', 'Plasmid', '⭕', 0x2ecc71, plasmidGroup, {
+    composition: 'A small, circular loop of DNA separate from the main chromosome.',
+    function: 'Often carries extra genes, such as antibiotic resistance, and can pass between cells.'
+  }, 3.6, plasmidInstances);
+
+  /* ============ Ribosomes ============ */
+  var riboInstances = [];
+  var riboGroup = new THREE.Group();
+  var riboGeo = new THREE.SphereGeometry(0.09, 10, 8);
+  var riboMat = mat(0x33608c, {roughness:.35, clearcoat:0.4});
+  for(var rb=0; rb<60; rb++){
+    var m2 = new THREE.Mesh(riboGeo, riboMat);
+    var xx = (Math.random()-0.5)*BODY_HALF_LEN*1.6;
+    var ang = Math.random()*Math.PI*2, rad = Math.random()*2.1;
+    m2.position.set(xx, Math.cos(ang)*rad, Math.sin(ang)*rad);
+    riboGroup.add(m2);
+    if(rb % 5 === 0){
+      riboInstances.push(m2);
+      addDrift(m2, {ampY:0.12, speed:0.6+Math.random()*0.5});
+    }
+  }
+  addOrganelle('ribosome', 'Ribosome', '⚙️', 0x33608c, riboGroup, {
+    composition: 'A small 70S complex of RNA and protein, smaller than its eukaryotic counterpart and free-floating.',
+    function: 'Translates genetic instructions into proteins.'
+  }, 4.0, riboInstances);
+
+  /* ============ Mesosome ============ */
+  var mesoGroup = new THREE.Group();
+  var mesoMat = mat(0xdd6fa0, {roughness:.35, clearcoat:0.4});
+  var mesoPts = [];
+  for(var mt=0; mt<=36; mt++){
+    var a = (mt/36)*Math.PI*5;
+    var rr = 0.15 + (mt/36)*0.5;
+    mesoPts.push(new THREE.Vector3(Math.cos(a)*rr, (mt/36)*0.9-0.45, Math.sin(a)*rr));
+  }
+  var mesoCurve = new THREE.CatmullRomCurve3(mesoPts);
+  mesoGroup.add(new THREE.Mesh(new THREE.TubeGeometry(mesoCurve, 90, 0.07, 6, false), mesoMat));
+  mesoGroup.position.set(4.6, 1.6, 1.2);
+  mesoGroup.rotation.z = 0.6;
+  addOrganelle('mesosome', 'Mesosome', '🫧', 0xdd6fa0, mesoGroup, {
+    composition: 'A whorled infolding of the plasma membrane.',
+    function: 'A classic teaching structure thought to assist cell-wall formation and respiration (now considered by many researchers to be a fixation artifact).'
+  }, 3.6);
+  addDrift(mesoGroup, {ampY:0.06, speed:0.3, ampRotY:0.05});
+
+  /* ============ Inclusion bodies ============ */
+  var inclInstances = [];
+  var inclGroup = new THREE.Group();
+  var inclMat = mat(0xf0d98c, {roughness:.4, clearcoat:0.4});
+  [[-3.0,1.3,-0.8],[-1.2,-1.6,1.1],[1.6,0.8,-1.3],[3.4,-0.9,-0.4]].forEach(function(p){
+    var s = new THREE.Mesh(new THREE.SphereGeometry(0.34,14,12), inclMat);
+    s.position.set(p[0],p[1],p[2]);
+    inclGroup.add(s);
+    inclInstances.push(s);
+    addDrift(s, {ampY:0.1, speed:0.4+Math.random()*0.4});
+  });
+  addOrganelle('inclusion body', 'Inclusion Body', '🫘', 0xf0d98c, inclGroup, {
+    composition: 'Granules of stored nutrients such as glycogen, lipids or polyphosphate.',
+    function: 'Act as internal energy and nutrient reserves for the cell.'
+  }, 3.6, inclInstances);
+
+  /* ============ Flagellum (animated whip-like tail) ============ */
+  var flagRoot = new THREE.Group();
+  flagRoot.position.set(-BODY_HALF_LEN - 0.4, 0, 0);
+  var flagMat = mat(0xdccb9e, {roughness:.4, clearcoat:0.3});
+  var FLAG_SEGMENTS = 7, FLAG_SEG_LEN = 1.05;
+  var flagSegGroups = [];
+  var flagCurrent = flagRoot;
+  for(var fs=0; fs<FLAG_SEGMENTS; fs++){
+    var segGroup = new THREE.Group();
+    var segRadius = 0.1 * (1 - fs/FLAG_SEGMENTS*0.6);
+    var segMesh = new THREE.Mesh(new THREE.CylinderGeometry(segRadius, segRadius*0.85, FLAG_SEG_LEN, 8), flagMat);
+    segMesh.rotation.z = Math.PI/2;
+    segMesh.position.x = -FLAG_SEG_LEN/2;
+    segGroup.add(segMesh);
+    var anchor = new THREE.Group();
+    anchor.position.x = -FLAG_SEG_LEN;
+    segGroup.add(anchor);
+    flagCurrent.add(segGroup);
+    flagSegGroups.push(segGroup);
+    flagCurrent = anchor;
+  }
+  scene.add(flagRoot);
+  addOrganelle('flagellum', 'Flagellum', '🌀', 0xdccb9e, flagRoot, {
+    composition: 'A long, whip-like filament of the protein flagellin, turned by a rotary motor at its base.',
+    function: 'Rotates like a propeller to move the cell through liquid.'
+  }, 1.7);
+
+  /* ============ Pili / Fimbriae ============ */
+  var piliGroup = new THREE.Group();
+  var piliMat = mat(0xcfd3d6, {roughness:.3, metalness:.1, clearcoat:0.3});
+  var PILI_R = 3.4;
+  for(var pl=0; pl<30; pl++){
+    var dir, pos;
+    if(Math.random() < 0.65){
+      var xw = (Math.random()-0.5)*BODY_HALF_LEN*1.7;
+      var th = Math.random()*Math.PI*2;
+      dir = new THREE.Vector3(0, Math.cos(th), Math.sin(th));
+      pos = new THREE.Vector3(xw, Math.cos(th)*PILI_R, Math.sin(th)*PILI_R);
+    } else {
+      var sign = Math.random()<0.5?1:-1;
+      var rv = new THREE.Vector3((Math.random()*0.6+0.4)*sign, Math.random()-0.5, Math.random()-0.5).normalize();
+      dir = rv;
+      pos = rv.clone().multiplyScalar(PILI_R).add(new THREE.Vector3(sign*BODY_HALF_LEN,0,0));
+    }
+    var needle = new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.02,0.42,5), piliMat);
+    needle.position.copy(pos).addScaledVector(dir, 0.18);
+    needle.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), dir);
+    piliGroup.add(needle);
+  }
+  addOrganelle('pili', 'Pili (Fimbriae)', '🪢', 0xcfd3d6, piliGroup, {
+    composition: 'Short, hair-like protein appendages covering the cell surface.',
+    function: 'Help the cell attach to surfaces and other cells; some transfer DNA during conjugation.'
+  }, 3.4);
+
+  /* ============ Ambient floating particles ============ */
+  var PARTICLE_COUNT = 110;
+  var particleGeo = new THREE.BufferGeometry();
+  var particlePos = new Float32Array(PARTICLE_COUNT*3);
+  var particleSpeed = new Float32Array(PARTICLE_COUNT);
+  var PBOUNDS = {x: BODY_HALF_LEN+1, yMin:-4, yMax:4, z:4};
+  for(var pi=0; pi<PARTICLE_COUNT; pi++){
+    particlePos[pi*3]   = (Math.random()*2-1)*PBOUNDS.x;
+    particlePos[pi*3+1] = PBOUNDS.yMin + Math.random()*(PBOUNDS.yMax-PBOUNDS.yMin);
+    particlePos[pi*3+2] = (Math.random()*2-1)*PBOUNDS.z;
+    particleSpeed[pi] = 0.1 + Math.random()*0.18;
+  }
+  particleGeo.setAttribute('position', new THREE.BufferAttribute(particlePos, 3));
+  var particleMat = new THREE.PointsMaterial({
+    color: 0xeaf8ff, size: 0.09, transparent: true, opacity: 0.4,
+    blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true
+  });
+  var particles = new THREE.Points(particleGeo, particleMat);
+  scene.add(particles);
+
+  /* ============ Selection halo ============ */
+  var haloMesh = new THREE.Mesh(
+    new THREE.SphereGeometry(1, 24, 16),
+    new THREE.MeshBasicMaterial({color:0xffffff, transparent:true, opacity:0, side:THREE.BackSide, depthWrite:false})
+  );
+  haloMesh.visible = false;
+  scene.add(haloMesh);
+
+  /* ============ Sidebar: grouped sections ============ */
+  var sections = [
+    {title:'Outer Structure', icon:'🧫', keys:['capsule','cell wall','plasma membrane','cytoplasm']},
+    {title:'Genetic Material', icon:'🧬', keys:['nucleoid','plasmid']},
+    {title:'Appendages', icon:'🌀', keys:['flagellum','pili']},
+    {title:'Internal Components', icon:'⚙️', keys:['ribosome','mesosome','inclusion body']}
+  ];
+
+  var orgListEl = document.getElementById('orgList');
+  document.getElementById('orgCount').textContent = registry.length;
+
+  sections.forEach(function(sec){
+    var head = document.createElement('div');
+    head.className = 'section-head';
+    head.innerHTML = '<span class="ic">'+sec.icon+'</span><span class="tx">'+sec.title+'</span><span class="bar"></span>';
+    orgListEl.appendChild(head);
+
+    sec.keys.forEach(function(k){
+      var entry = regByKey[k];
+      if(!entry) return;
+      var btn = document.createElement('button');
+      btn.className = 'org-btn';
+      btn.dataset.key = entry.key;
+
+      var badge = document.createElement('span');
+      badge.className = 'badge';
+      badge.textContent = entry.icon;
+      badge.style.background = hexToRgba(entry.color, 0.18);
+      badge.style.color = '#' + entry.color.toString(16).padStart(6,'0');
+      btn.appendChild(badge);
+
+      var labelEl = document.createElement('span');
+      labelEl.className = 'lbl';
+      labelEl.textContent = entry.label;
+      btn.appendChild(labelEl);
+
+      var arrow = document.createElement('span');
+      arrow.className = 'arrow';
+      arrow.textContent = '→';
+      btn.appendChild(arrow);
+
+      btn.addEventListener('click', function(){ selectOrganelle(entry.key); });
+      orgListEl.appendChild(btn);
+    });
+  });
+
+  /* ============ Selection / focus / highlight ============ */
+  var selectedKey = null;
+  var selectedInstObj = null;
+  var selectedOrigScale = null;
+  var selectedLocalPoint = null;
+  var selectedLocalCenter = null;
+  var selectedHaloRadius = 1;
+
+  var camAnim = { active:false, fromPos:new THREE.Vector3(), toPos:new THREE.Vector3(),
+                  fromTarget:new THREE.Vector3(), toTarget:new THREE.Vector3(), t:0, dur:0.85 };
+
+  var annoEl = document.getElementById('annotation');
+  var annoIcon = document.getElementById('annoIcon');
+  var annoTitleText = document.getElementById('annoTitleText');
+  var annoNote = document.getElementById('annoNote');
+  var annoComp = document.getElementById('annoComposition');
+  var annoFunc = document.getElementById('annoFunction');
+  var leaderSvg = document.getElementById('leaderSvg');
+  var leaderLine = document.getElementById('leaderLine');
+  var markerCore = document.getElementById('markerCore');
+  var markerPulse = document.getElementById('markerPulse');
+  var sidebar = document.getElementById('sidebar');
+
+  var focusAnchor = new THREE.Vector3();
+  var haveFocusAnchor = false;
+
+  function startCameraAnim(pos, target){
+    camAnim.fromPos.copy(camera.position);
+    camAnim.fromTarget.copy(controls.target);
+    camAnim.toPos.copy(pos);
+    camAnim.toTarget.copy(target);
+    camAnim.t = 0;
+    camAnim.active = true;
+    controls.enabled = false;
+  }
+
+  function clearInstanceHighlight(){
+    if(selectedInstObj && selectedOrigScale){
+      selectedInstObj.scale.copy(selectedOrigScale);
+    }
+    haloMesh.visible = false;
+  }
+
+  function focusOnInstance(instObj, anchorPoint){
+    scene.updateMatrixWorld(true);
+    var box = new THREE.Box3().setFromObject(instObj);
+    var center = box.getCenter(new THREE.Vector3());
+    var size = box.getSize(new THREE.Vector3());
+    var maxDim = Math.max(size.x, size.y, size.z, 0.5);
+    var entry = regByKey[instObj.userData.orgKey] || null;
+    var pad = (entry && entry.focusPad) || 2.2;
+    var dist = Math.max(controls.minDistance + 1.3, Math.min(maxDim*pad + 1.8, controls.maxDistance - 5));
+    var newPos = center.clone().addScaledVector(FOCUS_DIR, dist);
+    startCameraAnim(newPos, center);
+
+    clearInstanceHighlight();
+    selectedInstObj = instObj;
+    selectedOrigScale = instObj.scale.clone();
+    var anchorWorld = anchorPoint || center;
+    selectedLocalPoint = instObj.worldToLocal(anchorWorld.clone());
+    selectedLocalCenter = instObj.worldToLocal(center.clone());
+    selectedHaloRadius = Math.max(size.x,size.y,size.z)*0.7 + 0.35;
+
+    focusAnchor.copy(anchorWorld);
+    haveFocusAnchor = true;
+  }
+
+  function setActiveButton(key){
+    var btns = orgListEl.querySelectorAll('.org-btn');
+    btns.forEach(function(b){ b.classList.toggle('active', b.dataset.key === key); });
+  }
+
+  function selectOrganelle(key, clickedInstance, clickedPoint){
+    var entry = regByKey[key];
+    if(!entry) return;
+    selectedKey = key;
+    var instObj = clickedInstance || entry.instances[0];
+    focusOnInstance(instObj, clickedPoint);
+    setActiveButton(key);
+
+    var hex = '#' + entry.color.toString(16).padStart(6,'0');
+    annoIcon.textContent = entry.icon;
+    annoTitleText.textContent = entry.label;
+    annoComp.textContent = entry.info.composition;
+    annoFunc.textContent = entry.info.function;
+    if(entry.instances.length > 1){
+      annoNote.style.display = 'block';
+      annoNote.textContent = 'This cell contains ' + entry.instances.length + ' of these — shown: one example.';
+    } else {
+      annoNote.style.display = 'none';
+    }
+    annoEl.classList.add('show');
+    markerCore.setAttribute('fill', hex);
+    markerPulse.setAttribute('stroke', hex);
+    haloMesh.material.color.set(hex);
+    haloMesh.visible = true;
+    leaderSvg.style.opacity = window.innerWidth <= 760 ? 0 : 1;
+    updateAnnotationPosition();
+    if(window.innerWidth <= 760) sidebar.classList.remove('open');
+  }
+
+  function resetView(){
+    selectedKey = null;
+    haveFocusAnchor = false;
+    clearInstanceHighlight();
+    selectedInstObj = null;
+    setActiveButton(null);
+    annoEl.classList.remove('show');
+    leaderSvg.style.opacity = 0;
+    startCameraAnim(DEFAULT_CAM_POS, DEFAULT_TARGET);
+  }
+
+  document.getElementById('resetBtn').addEventListener('click', resetView);
+  document.getElementById('annoClose').addEventListener('click', resetView);
+
+  /* ============ Raycasting ============ */
+  var raycaster = new THREE.Raycaster();
+  var pointer = new THREE.Vector2();
+  var downPos = {x:0,y:0};
+
+  function onPointerDown(e){
+    var p = e.touches ? e.touches[0] : e;
+    downPos.x = p.clientX; downPos.y = p.clientY;
+  }
+  function onPointerUp(e){
+    var p = e.changedTouches ? e.changedTouches[0] : e;
+    var dx = p.clientX - downPos.x, dy = p.clientY - downPos.y;
+    if(Math.sqrt(dx*dx+dy*dy) > 6) return;
+    pointer.x = (p.clientX / window.innerWidth) * 2 - 1;
+    pointer.y = -(p.clientY / window.innerHeight) * 2 + 1;
+    raycaster.setFromCamera(pointer, camera);
+    var hits = raycaster.intersectObjects(interactive, false);
+    if(hits.length){
+      var hitObj = hits[0].object;
+      var k = hitObj.userData.orgKey;
+      var inst = hitObj.userData.instanceRef || hitObj;
+      if(k) selectOrganelle(k, inst, hits[0].point.clone());
+    }
+  }
+  renderer.domElement.addEventListener('pointerdown', onPointerDown);
+  renderer.domElement.addEventListener('pointerup', onPointerUp);
+
+  /* ============ Sidebar mobile toggle ============ */
+  var sidebarToggle = document.getElementById('sidebarToggle');
+  sidebarToggle.addEventListener('click', function(){ sidebar.classList.toggle('open'); });
+
+  /* ============ Resize ============ */
+  function onResize(){
+    camera.aspect = window.innerWidth/window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  }
+  window.addEventListener('resize', onResize);
+
+  /* ============ Leader line + marker + side-panel placement ============ */
+  function updateAnnotationPosition(){
+    if(!haveFocusAnchor || !annoEl.classList.contains('show')) return;
+
+    var v = focusAnchor.clone().project(camera);
+    var sx = (v.x*0.5+0.5)*window.innerWidth;
+    var sy = (-v.y*0.5+0.5)*window.innerHeight;
+    var behindCamera = v.z > 1;
+
+    markerCore.setAttribute('cx', sx); markerCore.setAttribute('cy', sy);
+    markerPulse.setAttribute('cx', sx); markerPulse.setAttribute('cy', sy);
+    markerCore.style.display = behindCamera ? 'none' : '';
+    markerPulse.style.display = behindCamera ? 'none' : '';
+
+    if(window.innerWidth <= 760){
+      annoEl.style.left = ''; annoEl.style.top = ''; annoEl.style.right = '';
+      leaderLine.style.display = 'none';
+      return;
+    }
+
+    var margin = 18;
+    var pw = annoEl.offsetWidth || 288, ph = annoEl.offsetHeight || 200;
+    var sidebarRect = sidebar.getBoundingClientRect();
+    var leftBound = sidebarRect.right + 14;
+    var rightBound = window.innerWidth - margin;
+
+    var panelLeft;
+    var spaceRight = rightBound - (sx + 26);
+    var spaceLeft = (sx - 26) - leftBound;
+    if(spaceRight >= pw || spaceRight >= spaceLeft){
+      panelLeft = Math.min(sx + 26, rightBound - pw);
+    } else {
+      panelLeft = sx - 26 - pw;
+    }
+    panelLeft = Math.max(leftBound, Math.min(panelLeft, rightBound - pw));
+    var panelTop = Math.max(margin, Math.min(sy - ph/2, window.innerHeight - ph - margin));
+
+    annoEl.style.right = 'auto';
+    annoEl.style.left = panelLeft + 'px';
+    annoEl.style.top = panelTop + 'px';
+
+    leaderLine.style.display = behindCamera ? 'none' : '';
+    var connectRight = panelLeft > sx;
+    var ex = connectRight ? panelLeft : panelLeft + pw;
+    var ey = Math.max(panelTop + 14, Math.min(sy, panelTop + ph - 14));
+    leaderLine.setAttribute('x1', sx); leaderLine.setAttribute('y1', sy);
+    leaderLine.setAttribute('x2', ex); leaderLine.setAttribute('y2', ey);
+  }
+
+  /* ============ Animation loop ============ */
+  var clock = new THREE.Clock();
+  function animate(){
+    requestAnimationFrame(animate);
+    var dt = clock.getDelta();
+    var t = clock.getElapsedTime();
+
+    if(camAnim.active){
+      camAnim.t += dt / camAnim.dur;
+      var f = Math.min(camAnim.t, 1);
+      var ease = 1 - Math.pow(1-f, 3);
+      camera.position.lerpVectors(camAnim.fromPos, camAnim.toPos, ease);
+      controls.target.lerpVectors(camAnim.fromTarget, camAnim.toTarget, ease);
+      if(f >= 1){ camAnim.active = false; controls.enabled = true; }
+    }
+
+    driftList.forEach(function(d){
+      d.obj.position.y = d.baseY + Math.sin(t*d.speed + d.phase)*d.ampY;
+      if(d.ampRotY) d.obj.rotation.y = d.baseRotY + Math.sin(t*d.speed*0.7 + d.phase)*d.ampRotY;
+      if(d.spin) d.obj.rotation.y = d.baseRotY + t*d.spin;
+    });
+
+    // whip-like waving motion for the flagellum
+    flagSegGroups.forEach(function(sg, idx){
+      sg.rotation.z = Math.sin(t*2.2 - idx*0.85)*0.26;
+      sg.rotation.y = Math.cos(t*1.7 - idx*0.85)*0.16;
+    });
+
+    var posAttr = particleGeo.attributes.position;
+    for(var pj=0; pj<PARTICLE_COUNT; pj++){
+      var yv = posAttr.getY(pj) + particleSpeed[pj]*dt;
+      if(yv > PBOUNDS.yMax) yv = PBOUNDS.yMin;
+      posAttr.setY(pj, yv);
+    }
+    posAttr.needsUpdate = true;
+
+    registry.forEach(function(entry){
+      var isSel = entry.key === selectedKey;
+      var target = isSel ? (0.4 + Math.sin(t*3.2)*0.25 + 0.25) : 0;
+      entry.mats.forEach(function(m){
+        m.emissive.setHex(entry.color);
+        m.emissiveIntensity += (target - m.emissiveIntensity) * 0.15;
+      });
+    });
+
+    if(selectedInstObj){
+      scene.updateMatrixWorld(true);
+      var pulseScale = 1 + (Math.sin(t*3.2)*0.5+0.5)*0.07;
+      selectedInstObj.scale.copy(selectedOrigScale).multiplyScalar(pulseScale);
+      scene.updateMatrixWorld(true);
+
+      var centerNow = selectedInstObj.localToWorld(selectedLocalCenter.clone());
+      haloMesh.position.copy(centerNow);
+      var haloPulse = 1 + Math.sin(t*3.2)*0.08;
+      haloMesh.scale.setScalar(selectedHaloRadius*haloPulse);
+      haloMesh.material.opacity = 0.16 + (Math.sin(t*3.2)*0.5+0.5)*0.14;
+
+      focusAnchor.copy(selectedInstObj.localToWorld(selectedLocalPoint.clone()));
+      updateAnnotationPosition();
+    }
+
+    controls.update();
+    renderer.render(scene, camera);
+  }
+
+  /* ============ Boot ============ */
+  window.addEventListener('load', function(){
+    setTimeout(function(){
+      var loading = document.getElementById('loading');
+      loading.style.opacity = 0;
+      setTimeout(function(){ loading.style.display='none'; }, 420);
+    }, 250);
+  });
+  onResize();
+  animate();
+})();
+</script>
+</body>
+</html>
